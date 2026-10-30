@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>現場查驗</title>
+<style>
+:root{
+  --bg:#f3f4f1; --card:#ffffff; --ink:#1b2320; --muted:#5a6560; --line:#dde2de;
+  --accent:#0c6758; --accent-ink:#ffffff; --accent-soft:#e2f0ec;
+  --ok:#1d7436; --ok-soft:#e3f3e8; --bad:#b3261e; --bad-soft:#fcebea;
+  --warn:#7d5300; --warn-soft:#fff3d4; --ph:#e9ece9;
+  --r:14px; --tap:48px;
+  --font:"PingFang TC","Noto Sans TC","Microsoft JhengHei","Heiti TC",system-ui,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.5;-webkit-text-size-adjust:100%}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+[hidden]{display:none!important}
+
+/* top bar */
+.top{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line);padding:10px 16px calc(10px);display:flex;align-items:center;gap:10px}
+.top .ttl{flex:1;min-width:0}
+.top h1{margin:0;font-size:19px;letter-spacing:.02em}
+.top .sub{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:6px 12px;font-size:14px;border:1px solid var(--line);background:var(--card);white-space:nowrap;min-height:36px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--ok)}
+.pill.off .dot{background:var(--bad)}
+.pill.q{font-weight:600}
+.pill.q.has{background:var(--warn-soft);border-color:#ecd28f;color:var(--warn)}
+
+.mockbar{background:#273330;color:#e8eeeb;font-size:13px;padding:6px 16px;display:flex;align-items:center;gap:12px;justify-content:space-between}
+.mockbar label{display:flex;align-items:center;gap:6px}
+
+main{max-width:720px;margin:0 auto;padding:12px 16px 120px}
+
+/* list view */
+.search{position:relative;margin:4px 0 10px;display:flex;gap:8px}
+.search .btn{flex:none;min-width:92px;height:56px}
+.search input{flex:1;min-width:0;height:56px;border-radius:var(--r);border:2px solid var(--line);background:var(--card);padding:0 16px;font-size:20px;letter-spacing:.04em}
+.search input:focus{outline:none;border-color:var(--accent)}
+.hint{font-size:13px;color:var(--muted);margin:0 2px 10px}
+.tabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:8px}
+.tab{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 14px;min-height:40px;font-size:15px;white-space:nowrap}
+.tab[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.meta{font-size:13px;color:var(--muted);margin:2px 2px 8px;display:flex;justify-content:space-between;gap:8px}
+.list{display:flex;flex-direction:column;gap:8px}
+.row{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;min-height:64px;width:100%}
+.row:active{background:var(--accent-soft)}
+.seq{font-size:13px;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:8px;padding:2px 8px;white-space:nowrap}
+.seq.alt{color:var(--muted);background:var(--ph)}
+.row .id{font-family:var(--mono);font-size:15px;color:var(--muted)}
+.row .id b{color:var(--ink);font-size:17px}
+.row .who{grid-column:1;font-size:15px;color:var(--muted)}
+.row .tag{grid-row:1 / span 2;grid-column:2;font-size:13px;text-align:right}
+.done-tag{color:var(--ok);font-weight:600}
+.q-tag{color:var(--warn);font-weight:600}
+.draft-tag{color:var(--accent);font-weight:600}
+.empty{text-align:center;color:var(--muted);padding:40px 12px}
+
+/* case view */
+.backbar{display:flex;align-items:center;gap:8px;margin:0 0 10px}
+.back{border:none;background:none;color:var(--accent);font-weight:600;min-height:var(--tap);padding:0 4px;font-size:17px}
+.casehead{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:12px}
+.casehead .cid{font-family:var(--mono);font-size:22px;font-weight:700;letter-spacing:.03em;word-break:break-all}
+.casehead .line{display:flex;flex-wrap:wrap;gap:6px 8px;margin-top:6px;align-items:center}
+.chip{font-size:14px;border-radius:8px;padding:2px 10px;background:var(--ph);color:var(--ink)}
+.chip.type{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.banner{border-radius:10px;padding:10px 12px;font-size:15px;margin-top:10px}
+.banner.warn{background:var(--warn-soft);color:var(--warn)}
+.banner.info{background:var(--accent-soft);color:var(--accent)}
+
+.sec{margin:22px 0 10px;display:flex;align-items:baseline;gap:8px}
+.sec h2{margin:0;font-size:18px}
+.sec .n{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;font-size:14px;font-weight:700;flex:none;align-self:center}
+.sec .aside{margin-left:auto;font-size:14px;color:var(--muted)}
+
+.item{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:10px;scroll-margin-top:80px}
+.item.err{border-color:var(--bad);box-shadow:0 0 0 2px var(--bad-soft)}
+.item .lab{font-size:14px;color:var(--muted);margin-bottom:2px}
+.item .val{font-size:19px;font-weight:600;word-break:break-word}
+.item .val.big{font-family:var(--mono);font-size:24px;letter-spacing:.04em}
+.item .subs{margin-top:6px;font-size:15px;color:var(--muted)}
+.item .subs div{display:flex;gap:8px}
+.item .subs span:first-child{flex:none;min-width:4.5em}
+.item .subs a{color:var(--accent)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:16px;margin-top:2px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;font-weight:600;word-break:break-word}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.missing{color:var(--warn);font-weight:700}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.seg button{min-height:var(--tap);border-radius:10px;border:2px solid var(--line);background:var(--card);font-weight:600;font-size:17px}
+.seg button[data-v="正確"][aria-pressed="true"]{background:var(--ok);border-color:var(--ok);color:#fff}
+.seg button[data-v="有誤"][aria-pressed="true"]{background:var(--bad);border-color:var(--bad);color:#fff}
+.fix{margin-top:10px}
+.fix label,.field label{display:block;font-size:14px;color:var(--muted);margin-bottom:4px}
+textarea,.field input{width:100%;border:2px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff;font-size:17px;min-height:var(--tap)}
+textarea{min-height:84px;resize:vertical}
+textarea:focus,.field input:focus{outline:none;border-color:var(--accent)}
+.errmsg{color:var(--bad);font-size:14px;margin-top:6px}
+
+/* attachments */
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.thumb{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--ph);border:1px solid var(--line);padding:0;display:block;width:100%}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb .cap{position:absolute;left:0;right:0;bottom:0;font-size:11px;line-height:1.3;padding:4px 6px;background:rgba(20,28,25,.72);color:#fff;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.thumb .x{position:absolute;top:4px;right:4px;width:34px;height:34px;border-radius:50%;border:none;background:rgba(20,28,25,.75);color:#fff;font-size:18px;line-height:1}
+.files{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.file{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:var(--tap);text-align:left;width:100%;font-size:15px}
+.file .ic{flex:none;font-size:12px;font-weight:700;color:var(--bad);border:1.5px solid var(--bad);border-radius:4px;padding:0 4px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.muted{color:var(--muted);font-size:15px}
+
+.camrow{display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:10px}
+.btn{min-height:56px;border-radius:12px;border:2px solid var(--accent);background:var(--card);color:var(--accent);font-weight:700;font-size:17px;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 12px}
+.btn.solid{background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{border-color:var(--line);color:var(--ink)}
+.btn:disabled{opacity:.5}
+.filein{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+
+/* survey */
+.q{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:10px}
+.q .qt{font-weight:600;margin-bottom:8px}
+.opts{display:flex;flex-direction:column;gap:6px}
+.opt{display:flex;align-items:center;gap:10px;min-height:var(--tap);border:2px solid var(--line);border-radius:10px;padding:6px 12px;background:#fff;text-align:left;width:100%}
+.opt[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);font-weight:600}
+.opt .rb{width:20px;height:20px;border-radius:50%;border:2px solid var(--muted);flex:none}
+.opt[aria-pressed="true"] .rb{border:6px solid var(--accent)}
+
+/* bottom bar */
+.bottom{position:fixed;left:0;right:0;bottom:0;z-index:15;background:var(--card);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+.bottom .in{max-width:720px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.bottom .prog{flex:1;font-size:14px;color:var(--muted);line-height:1.35}
+.bottom .prog b{color:var(--ink)}
+.bottom .btn{min-width:150px}
+
+/* done view */
+.donebox{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:24px 18px;text-align:center;margin-top:16px}
+.donebox .big{font-size:22px;font-weight:700;margin:6px 0}
+.bar{height:10px;background:var(--ph);border-radius:999px;overflow:hidden;margin:14px 0 6px}
+.bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s}
+.donebox .acts{display:grid;gap:8px;margin-top:18px}
+
+/* sheet / modal */
+.scrim{position:fixed;inset:0;background:rgba(15,22,20,.5);z-index:40;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--card);width:100%;max-width:720px;max-height:85vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+.sheet h3{margin:0 0 4px;font-size:19px}
+.qitem{border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px}
+.qitem .t{display:flex;justify-content:space-between;gap:8px;font-weight:600}
+.qitem .s{font-size:14px;color:var(--muted)}
+.qitem .e{font-size:14px;color:var(--bad);margin-top:4px}
+.modal{background:var(--card);border-radius:16px;padding:20px 18px;margin:auto 16px;max-width:420px;width:100%}
+.scrim.center{align-items:center}
+.modal p{margin:0 0 16px}
+.modal .acts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lb{position:fixed;inset:0;z-index:50;background:rgba(10,14,12,.94);display:flex;flex-direction:column}
+.lb .lbtop{display:flex;justify-content:space-between;align-items:center;color:#fff;padding:10px 12px;gap:10px;font-size:14px}
+.lb .lbtop span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lb .lbclose{background:none;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:10px;min-height:44px;padding:0 14px;flex:none}
+.lb .stage{flex:1;display:flex;align-items:center;justify-content:center;padding:8px;overflow:auto}
+.lb img{max-width:100%;max-height:100%;object-fit:contain}
+.lb .phbig{width:min(92vw,520px);aspect-ratio:4/3;background:#2a322f;border-radius:10px;display:grid;place-items:center;color:#a9b5b0;font-size:14px;text-align:center;padding:12px}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#1b2320;color:#fff;padding:10px 16px;border-radius:12px;font-size:15px;z-index:60;max-width:calc(100% - 32px);text-align:center}
+.spin{width:18px;height:18px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp 1s linear infinite;display:inline-block;vertical-align:middle}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* gate */
+.gate{max-width:420px;margin:24px auto 0;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:22px 18px}
+.gate h2{margin:0 0 4px;font-size:20px}
+.gate .field{margin-top:14px}
+.gate .field input{font-size:20px;letter-spacing:.06em}
+.gate .btn{width:100%;margin-top:18px}
+.gate .gmsg{color:var(--bad);font-size:15px;margin-top:10px}
+.who-btn{border:none;background:none;padding:0;font:inherit;color:var(--muted);font-size:13px;text-align:left;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.who-btn u{color:var(--accent);text-decoration:none;margin-left:4px}
+
+/* ---------- 平板 ---------- */
+@media (min-width:700px){
+  main{max-width:1180px;padding:16px 24px 120px}
+  .bottom .in,.sheet{max-width:1180px}
+  .list{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .grid{grid-template-columns:repeat(4,1fr)}
+  .search input{height:60px}
+  .sheet{max-width:640px;border-radius:18px;margin-bottom:24px}
+  .scrim{align-items:center}
+}
+@media (min-width:900px){
+  .casegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 24px;align-items:start}
+  .casegrid .colB > .sec:first-child,.casegrid .colA > .sec:first-child{margin-top:4px}
+  .grid{grid-template-columns:repeat(3,1fr)}
+  .list{grid-template-columns:1fr 1fr 1fr}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="ttl">
+    <h1>現場查驗</h1>
+    <button class="who-btn" id="who" type="button">115年度高溫敏感族群降溫節能補助</button>
+  </div>
+  <span class="pill" id="net"><span class="dot"></span><span id="netTxt">連線中</span></span>
+  <button class="pill q" id="qBtn" aria-label="待上傳清單">待上傳 <span id="qCount">0</span></button>
+</header>
+<div class="mockbar" id="mockbar" hidden>
+  <span>預覽模式：資料皆為虛構，通行碼 123456</span>
+  <label><input type="checkbox" id="mockOffline">模擬離線</label>
+</div>
+
+<main>
+  <!-- 通行碼與姓名 -->
+  <section id="vGate" hidden>
+    <div class="gate">
+      <h2>開始使用</h2>
+      <div class="muted">第一次使用請輸入通行碼與您的姓名，之後這台裝置會記住。</div>
+      <div class="field"><label for="gCode">通行碼</label><input id="gCode" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div>
+      <div class="field"><label for="gName">查驗人員姓名</label><input id="gName" type="text" autocomplete="name" maxlength="20"></div>
+      <div class="gmsg" id="gMsg" hidden></div>
+      <button class="btn solid" type="button" id="gGo">開始使用</button>
+    </div>
+  </section>
+
+  <!-- 清單 -->
+  <section id="vList">
+    <div class="search" id="searchBox">
+      <input id="q" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" placeholder="輸入案號（可只打末幾碼）" aria-label="案號">
+      <button class="btn solid" type="button" id="goBtn">確認</button>
+    </div>
+    <p class="hint">例：輸入「1000015」或「015」都可以找到 O2026061000015，也可輸入申請人姓名</p>
+    <div class="meta"><span id="listCount"></span><span id="fetched"></span></div>
+    <div class="list" id="list"></div>
+  </section>
+
+  <!-- 案件 -->
+  <section id="vCase" hidden></section>
+
+  <!-- 送出後 -->
+  <section id="vDone" hidden></section>
+</main>
+
+<div class="bottom" id="bottom" hidden>
+  <div class="in">
+    <div class="prog" id="prog"></div>
+    <button class="btn solid" id="submitBtn">送出查驗結果</button>
+  </div>
+</div>
+
+<input id="camIn" class="filein" type="file" accept="image/*" capture="environment">
+<input id="galIn" class="filein" type="file" accept="image/*" multiple>
+
+<script>
+/* =========================================================
+   設定
+   ========================================================= */
+const IS_GAS = typeof google !== 'undefined' && google.script && google.script.run;
+// 放在 Google 網域以外時，填入 Apps Script 網頁應用程式網址，改用資料接口連線
+const EXEC_URL = 'https://script.google.com/macros/s/AKfycbweTuwX71TwPAzXYZeUPRN3ffL3nbTet0PfaQvMAjH5L_-4KphymBUgkiNbKFuvUy7C/exec';
+const PHOTO_MAX_SIDE = 1600;   // 現場照片壓縮後長邊像素
+const PHOTO_QUALITY  = 0.82;
+const CACHE_KEY = 'inspect_cases_v1';
+const CODE_KEY  = 'inspect_code';
+const NAME_KEY  = 'inspect_name';
+// 全形數字轉半形、去除所有空白（iPhone 注音鍵盤可能打出全形數字）
+function normCode(s){ return String(s == null ? '' : s).replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/\s+/g, ''); }
+function lsGet(k){ try{ return localStorage.getItem(k) || ''; }catch(e){ return ''; } }
+function lsSet(k, v){ try{ if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); }catch(e){} }
+
+const ITEM_DEFS = [
+  {key:'applicant',  label:'申請人'},
+  {key:'address',    label:'設備使用地址'},
+  {key:'vulnerable', label:'脆弱族群對象'},
+  {key:'elec',       label:'用戶電號'},
+  {key:'equipment',  label:'申辦項目與設備'}
+];
+
+/* =========================================================
+   小工具
+   ========================================================= */
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2,'0');
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+function dateKey(d){ return d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()); }
+function hm(d){ return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+function fmtTime(iso){ const d = new Date(iso); return (d.getMonth()+1) + '/' + d.getDate() + ' ' + hm(d); }
+function fmtElec(no){
+  const d = String(no || '').replace(/\D/g,'');
+  if (d.length !== 11) return no || '';
+  return d.slice(0,2)+'-'+d.slice(2,4)+'-'+d.slice(4,8)+'-'+d.slice(8,10)+'-'+d.slice(10);
+}
+function toast(msg, ms){
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), ms || 2400);
+}
+function confirmBox(msg, ok, cancel){
+  return new Promise(res => {
+    const s = document.createElement('div'); s.className = 'scrim center';
+    s.innerHTML = '<div class="modal" role="dialog" aria-modal="true"><p>'+esc(msg)+'</p><div class="acts">'+
+      '<button class="btn ghost" data-a="0">'+esc(cancel||'取消')+'</button><button class="btn solid" data-a="1">'+esc(ok||'確定')+'</button></div></div>';
+    s.addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (b){ s.remove(); res(b.dataset.a === '1'); }});
+    document.body.appendChild(s);
+  });
+}
+function isOnline(){ return navigator.onLine && !(MOCK_MODE && $('#mockOffline').checked); }
+
+/* =========================================================
+   手機端儲存（IndexedDB）：草稿與待上傳佇列
+   ========================================================= */
+const Store = {
+  db: null, mem: {drafts:{}, queue:{}}, ok: true,
+  open(){
+    return new Promise(res => {
+      // 若瀏覽器環境不回應（例如受限的內嵌頁面），1.5 秒後改用暫存記憶體，避免整頁卡住
+      const timer = setTimeout(() => { this.ok = false; this.db = null; res(); }, 1500);
+      const done = res; res = () => { clearTimeout(timer); done(); };
+      try{
+        const r = indexedDB.open('inspect_db', 1);
+        r.onupgradeneeded = () => { const db = r.result;
+          if (!db.objectStoreNames.contains('drafts')) db.createObjectStore('drafts', {keyPath:'caseId'});
+          if (!db.objectStoreNames.contains('queue'))  db.createObjectStore('queue',  {keyPath:'sid'}); };
+        r.onsuccess = () => { this.db = r.result; res(); };
+        r.onerror = () => { this.ok = false; res(); };
+      }catch(e){ this.ok = false; res(); }
+    });
+  },
+  _req(store, mode, fn){
+    if (!this.db) return Promise.resolve(fn(null));
+    return new Promise((res, rej) => {
+      const tx = this.db.transaction(store, mode); const st = tx.objectStore(store);
+      const rq = fn(st); tx.oncomplete = () => res(rq && rq.result); tx.onerror = () => rej(tx.error);
+    });
+  },
+  get(store, key){ return this.db ? this._req(store,'readonly', st => st.get(key)) : Promise.resolve(this.mem[store][key]); },
+  put(store, val){ if (!this.db){ this.mem[store][val.caseId || val.sid] = val; return Promise.resolve(); } return this._req(store,'readwrite', st => st.put(val)); },
+  del(store, key){ if (!this.db){ delete this.mem[store][key]; return Promise.resolve(); } return this._req(store,'readwrite', st => st.delete(key)); },
+  all(store){ return this.db ? this._req(store,'readonly', st => st.getAll()) : Promise.resolve(Object.values(this.mem[store])); }
+};
+
+/* =========================================================
+   雲端接口（部署後接 Apps Script；預覽時用假資料）
+   ========================================================= */
+const MOCK_MODE = !IS_GAS && !EXEC_URL;
+function gasRun(fn, ...args){
+  return new Promise((res, rej) => google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));
+}
+async function post(fn, ...args){
+  let r;
+  try{
+    r = await fetch(EXEC_URL, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({fn, args})});
+  }catch(e){ throw new Error('網路中斷'); }
+  if (!r.ok) throw new Error('伺服器回應異常（' + r.status + '）');
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || '未知錯誤');
+  return j.data;
+}
+const gas = IS_GAS ? gasRun : post;
+let api = (IS_GAS || EXEC_URL) ? {
+  bootstrap:   ()                 => gas('getBootstrap', S.code),
+  attachments: caseId             => gas('getAttachments', S.code, caseId),
+  image:       fileId             => gas('getImage', S.code, fileId),
+  begin:       rec                => gas('beginSubmission', S.code, rec),
+  photo:       (sid, i, name, b64)=> gas('uploadPhoto', S.code, sid, i, name, b64),
+  finish:      rec                => gas('finishSubmission', S.code, rec)
+} : null; // 假資料接口在檔案最後定義
+const errMsg = e => (e && e.message) ? e.message : String(e);
+const isCodeErr = e => /PASSCODE/.test(errMsg(e));
+const isLocked  = e => /LOCKED/.test(errMsg(e));
+function friendly(e){
+  if (isCodeErr(e)) return '通行碼錯誤或已變更';
+  if (isLocked(e))  return '嘗試次數過多，請 10 分鐘後再試';
+  return errMsg(e);
+}
+
+/* =========================================================
+   狀態
+   ========================================================= */
+const S = {
+  code:lsGet(CODE_KEY), name:lsGet(NAME_KEY), config:{questions:[], placeholder:false}, cases:[], fetchedAt:null,
+  drafts:{}, queue:[], query:null, cur:null, d:null, uploading:false, attach:null
+};
+
+/* =========================================================
+   啟動
+   ========================================================= */
+async function boot(){
+  if (MOCK_MODE){ $('#mockbar').hidden = false; }
+  await Store.open();
+  (await Store.all('drafts')).forEach(d => S.drafts[d.caseId] = true);
+  S.queue = await Store.all('queue');
+  renderNet(); renderQueueBtn(); renderWho();
+  if (!S.code || !S.name){ showGate(''); return; }
+  try{ const c = JSON.parse(lsGet(CACHE_KEY) || 'null'); if (c) applyBoot(c); }catch(e){}
+  renderList();
+  await refresh();
+  processQueue();
+}
+function applyBoot(b){
+  S.config = b.config || S.config; S.cases = b.cases || []; S.fetchedAt = b.fetchedAt;
+}
+function renderWho(){
+  $('#who').innerHTML = S.name ? ('查驗人員：' + esc(S.name) + '<u>修改</u>') : '115年度高溫敏感族群降溫節能補助';
+}
+async function refresh(){
+  if (!isOnline() || !S.code){ renderList(); return; }
+  try{
+    const b = await api.bootstrap();
+    applyBoot(b);
+    lsSet(CACHE_KEY, JSON.stringify(b));
+  }catch(e){
+    if (isCodeErr(e)){ authFail(); return; }
+    if (!S.cases.length) $('#list').innerHTML = '<div class="empty">名單載入失敗：'+esc(friendly(e))+'<br>請確認網路後重新整理</div>';
+  }
+  renderList();
+}
+
+/* 通行碼與姓名 */
+function showGate(msg){
+  ['#vList','#vCase','#vDone'].forEach(v => $(v).hidden = true);
+  $('#bottom').hidden = true;
+  $('#vGate').hidden = false;
+  $('#gCode').value = S.code || '';
+  $('#gName').value = S.name || '';
+  $('#gMsg').textContent = msg || ''; $('#gMsg').hidden = !msg;
+  setTimeout(() => (S.code ? $('#gName') : $('#gCode')).focus(), 50);
+}
+function authFail(){
+  // 通行碼錯誤或已變更：清掉手機上的通行碼與名單，待上傳的紀錄保留
+  S.code = ''; lsSet(CODE_KEY, ''); lsSet(CACHE_KEY, '');
+  S.cases = []; S.fetchedAt = null;
+  showGate('通行碼錯誤或已變更，請重新輸入');
+}
+async function gateGo(){
+  const code = normCode($('#gCode').value), name = $('#gName').value.trim();
+  const msg = m => { $('#gMsg').textContent = m; $('#gMsg').hidden = false; };
+  if (!code) return msg('請輸入通行碼');
+  if (!name) return msg('請輸入查驗人員姓名');
+  const codeChanged = code !== S.code;
+  if (codeChanged || !S.cases.length){
+    if (!isOnline()) return msg('第一次使用或更換通行碼需要網路');
+    $('#gGo').disabled = true; $('#gGo').textContent = '確認中…';
+    const old = S.code; S.code = code;
+    try{
+      const b = await api.bootstrap();
+      applyBoot(b); lsSet(CACHE_KEY, JSON.stringify(b));
+    }catch(e){
+      S.code = old;
+      $('#gGo').disabled = false; $('#gGo').textContent = '開始使用';
+      return msg(friendly(e));
+    }
+    $('#gGo').disabled = false; $('#gGo').textContent = '開始使用';
+  }
+  S.code = code; S.name = name; lsSet(CODE_KEY, code); lsSet(NAME_KEY, name);
+  renderWho();
+  $('#vGate').hidden = true; show('#vList'); renderList();
+  processQueue();
+}
+$('#gGo').addEventListener('click', gateGo);
+['#gCode','#gName'].forEach(s => $(s).addEventListener('keydown', e => { if (e.key === 'Enter' || e.keyCode === 13){ e.preventDefault(); gateGo(); } }));
+$('#who').addEventListener('click', () => { if (S.name) showGate(''); });
+
+/* =========================================================
+   網路狀態與佇列按鈕
+   ========================================================= */
+function renderNet(){
+  const on = isOnline();
+  $('#net').classList.toggle('off', !on);
+  $('#netTxt').textContent = on ? '連線中' : '離線';
+}
+function pendingQueue(){ return S.queue.filter(q => q.state !== 'done'); }
+function renderQueueBtn(){
+  const n = pendingQueue().length;
+  $('#qCount').textContent = n;
+  $('#qBtn').classList.toggle('has', n > 0);
+}
+window.addEventListener('online',  () => { renderNet(); refresh(); processQueue(); });
+window.addEventListener('offline', () => renderNet());
+setInterval(() => { renderNet(); if (isOnline() && pendingQueue().length) processQueue(); }, 30000);
+
+/* =========================================================
+   清單
+   ========================================================= */
+function caseFlags(c){
+  const local = S.queue.filter(q => q.caseId === c.id);
+  const done  = (c.inspected && c.inspected.length) || local.some(q => q.state === 'done');
+  const queued = local.some(q => q.state !== 'done');
+  return {done, queued, draft: !!S.drafts[c.id]};
+}
+function matchCases(raw){
+  const q = raw.trim().toUpperCase();
+  return S.cases.filter(c => {
+    const id = c.id.toUpperCase();
+    if (/^\d+$/.test(q)) return id.endsWith(q) || (q.length >= 8 && id.includes(q)); // 純數字：比對尾碼
+    if (/^O\d*$/.test(q)) return id.startsWith(q);
+    return (c.applicant.name || '').includes(raw.trim());
+  });
+}
+function renderList(){
+  $('#fetched').textContent = S.fetchedAt ? ((isOnline() ? '名單更新 ' : '離線使用 ') + fmtTime(S.fetchedAt) + ' 的名單') : (S.cases.length ? '' : '名單載入中…');
+  // 首頁不顯示清單，按「確認」後才顯示搜尋結果
+  if (S.query == null){ $('#listCount').textContent = ''; $('#list').innerHTML = ''; return; }
+  if (!S.cases.length){ $('#listCount').textContent = ''; $('#list').innerHTML = '<div class="empty"><span class="spin"></span> 名單載入中…</div>'; return; }
+  const rows = matchCases(S.query);
+  $('#listCount').textContent = '「' + S.query + '」共 ' + rows.length + ' 筆';
+  if (!rows.length){ $('#list').innerHTML = '<div class="empty">找不到符合的案件，請確認案號</div>'; return; }
+  $('#list').innerHTML = rows.map(c => {
+    const f = caseFlags(c);
+    const tail = c.id.slice(-5), head = c.id.slice(0, -5);
+    const tag = f.queued ? '<span class="q-tag">待上傳</span>' : f.done ? '<span class="done-tag">✓ 已查驗</span>' : f.draft ? '<span class="draft-tag">草稿</span>' : '';
+    return '<button class="row" data-id="'+esc(c.id)+'">'+
+      '<span class="id">'+esc(head)+'<b>'+esc(tail)+'</b></span>'+
+      '<span class="tag">'+tag+'</span>'+
+      '<span class="who">'+esc(c.applicant.name)+'・'+esc(c.type)+'</span></button>';
+  }).join('');
+}
+// 不使用 form submit（部分內嵌環境會擋掉表單送出），改為按鈕點擊與 Enter 鍵
+function doSearch(){
+  const v = $('#q').value.trim();
+  if (!v){ toast('請輸入案號'); $('#q').focus(); return; }
+  S.query = v; $('#q').blur(); renderList();
+}
+$('#goBtn').addEventListener('click', doSearch);
+$('#q').addEventListener('keydown', e => { if (e.key === 'Enter' || e.keyCode === 13){ e.preventDefault(); doSearch(); } });
+$('#list').addEventListener('click', e => { const r = e.target.closest('.row'); if (r) openCase(r.dataset.id); });
+
+/* =========================================================
+   案件頁
+   ========================================================= */
+function show(view){
+  ['#vGate','#vList','#vCase','#vDone'].forEach(v => $(v).hidden = (v !== view));
+  $('#bottom').hidden = view !== '#vCase';
+  window.scrollTo(0,0);
+}
+async function openCase(id){
+  const c = S.cases.find(x => x.id === id); if (!c) return;
+  S.cur = c;
+  S.d = (await Store.get('drafts', id)) || {caseId:id, sid:uid(), items:{}, photos:[], survey:{}, note:'', vulName:'', startedAt:new Date().toISOString()};
+  S.attach = null;
+  renderCase(); show('#vCase'); loadAttachments();
+}
+let saveT = null;
+function saveDraft(){
+  clearTimeout(saveT);
+  saveT = setTimeout(flushDraft, 300);
+}
+function flushDraft(){
+  clearTimeout(saveT); saveT = null;
+  if (S.d && !$('#vCase').hidden){ Store.put('drafts', S.d); S.drafts[S.d.caseId] = true; }
+}
+// 切到其他 App、鎖螢幕或關閉頁面時立即存檔
+document.addEventListener('visibilitychange', () => { if (document.hidden && saveT) flushDraft(); });
+window.addEventListener('pagehide', () => { if (saveT) flushDraft(); });
+function itemBody(key, c){
+  if (key === 'applicant'){
+    const ph = [];
+    if (c.applicant.mobile) ph.push('<div><span>行動電話</span><a href="tel:'+esc(c.applicant.mobile)+'">'+esc(c.applicant.mobile)+'</a></div>');
+    if (c.applicant.tel)    ph.push('<div><span>市話</span><a href="tel:'+esc(c.applicant.tel)+'">'+esc(c.applicant.tel)+'</a></div>');
+    return '<div class="val">'+esc(c.applicant.name)+'</div>'+(ph.length?'<div class="subs">'+ph.join('')+'</div>':'');
+  }
+  if (key === 'address'){
+    const mail = c.address.mail && c.address.mail !== c.address.equip ? '<div class="subs"><div><span>通訊地址</span><span>'+esc(c.address.mail)+'</span></div></div>' : '';
+    return '<div class="val">'+esc(c.address.equip)+'</div>'+mail;
+  }
+  if (key === 'vulnerable'){
+    const v = c.vulnerable;
+    const chips = (v.categories||[]).map(x => '<span class="chip">'+esc(x)+'</span>').join('');
+    const nameHtml = v.missing
+      ? '<div class="val missing">名單未載姓名</div>'
+      : '<div class="val">'+esc(v.names.join('、'))+'</div>';
+    let h = nameHtml + (chips ? '<div class="chips">'+chips+'</div>' : '');
+    h += '<div class="subs"><div><span>與申請人</span><span>'+esc(v.relation||'')+'</span></div>'+(v.residence?'<div><span>居住現況</span><span>'+esc(v.residence)+'</span></div>':'')+'</div>';
+    if (v.missing){
+      h += '<div class="field fix"><label for="vulName">現場確認之脆弱族群對象姓名（必填）</label><input id="vulName" data-k="vulName" value="'+esc(S.d.vulName)+'" autocomplete="off"></div>';
+    }
+    return h;
+  }
+  if (key === 'elec'){
+    return '<div class="val big">'+esc(fmtElec(c.elec.no))+'</div>'+(c.elec.holder?'<div class="subs"><div><span>用電戶名</span><span>'+esc(c.elec.holder)+'</span></div></div>':'');
+  }
+  if (key === 'equipment'){
+    return '<div class="val">'+esc(c.type)+'</div><dl class="kv">'+c.equipment.map(r => '<dt>'+esc(r.label)+'</dt><dd>'+esc(r.value||'—')+'</dd>').join('')+'</dl>';
+  }
+  return '';
+}
+function itemCard(def, c){
+  const it = S.d.items[def.key] || {};
+  const missing = def.key === 'vulnerable' && c.vulnerable.missing;
+  const seg = missing ? '' :
+    '<div class="seg" role="group" aria-label="'+esc(def.label)+'核對結果">'+
+      ['正確','有誤'].map(v => '<button data-act="res" data-key="'+def.key+'" data-v="'+v+'" aria-pressed="'+(it.result===v)+'">'+(v==='正確'?'✓ 正確':'✕ 有誤')+'</button>').join('')+
+    '</div>'+
+    (it.result === '有誤' ? '<div class="fix"><label for="fix_'+def.key+'">正確內容／說明（必填）</label><textarea id="fix_'+def.key+'" data-fix="'+def.key+'">'+esc(it.correction||'')+'</textarea></div>' : '');
+  return '<div class="item" id="it_'+def.key+'"><div class="lab">'+esc(def.label)+'</div>'+itemBody(def.key, c)+seg+'<div class="errmsg" hidden></div></div>';
+}
+function renderCase(){
+  const c = S.cur, d = S.d;
+  const f = caseFlags(c);
+  let h = '<div class="backbar"><button class="back" data-act="back">‹ 返回清單</button></div>';
+  h += '<div class="casehead"><div class="cid">'+esc(c.id)+'</div><div class="line">'+
+       '<span class="chip type">'+esc(c.type)+'</span><span class="chip">'+esc(c.status)+'</span></div>';
+  if (c.status !== '申辦已完成') h += '<div class="banner warn">此案件狀態為「'+esc(c.status)+'」，尚未結案</div>';
+  if (f.done || f.queued) h += '<div class="banner info">此案件'+(f.queued?'已有一筆待上傳的查驗紀錄':'已查驗過')+'，再次送出會另存一筆，不會覆蓋</div>';
+  h += '</div>';
+
+  h += '<div class="casegrid"><div class="colA">';
+  h += '<div class="sec"><span class="n">1</span><h2>逐項核對</h2><span class="aside" id="chkCount"></span></div>';
+  h += ITEM_DEFS.map(def => itemCard(def, c)).join('');
+  h += '</div><div class="colB">';
+
+  h += '<div class="sec"><span class="n">2</span><h2>申請附件</h2><span class="aside">點圖可放大</span></div><div id="attach"></div>';
+
+  h += '<div class="sec"><span class="n">3</span><h2>現場照片</h2><span class="aside" id="photoCount"></span></div>';
+  h += '<div class="camrow"><button class="btn solid" data-act="cam">拍照</button><button class="btn" data-act="gal">從相簿選</button></div>';
+  h += '<div class="grid" id="photos"></div><div class="errmsg" id="photoErr" hidden></div>';
+
+  h += '<div class="sec"><span class="n">4</span><h2>滿意度調查</h2></div>';
+  if (S.config.placeholder) h += '<div class="banner warn" style="margin:0 0 10px">題目待提供，以下為版面示意</div>';
+  h += S.config.questions.map(q => {
+    const a = d.survey[q.id];
+    if (q.type === 'text') return '<div class="q"><div class="qt">'+esc(q.title)+'</div><textarea data-sv="'+esc(q.id)+'">'+esc(a||'')+'</textarea></div>';
+    return '<div class="q"><div class="qt">'+esc(q.title)+'</div><div class="opts">'+
+      q.options.map(o => '<button class="opt" data-act="sv" data-q="'+esc(q.id)+'" data-v="'+esc(o)+'" aria-pressed="'+(a===o)+'"><span class="rb"></span>'+esc(o)+'</button>').join('')+'</div></div>';
+  }).join('');
+
+  h += '<div class="sec"><span class="n">5</span><h2>查驗備註</h2></div>';
+  h += '<textarea data-k="note" placeholder="現場狀況、民眾反映等（選填）">'+esc(d.note)+'</textarea>';
+  h += '<p class="muted" style="margin-top:14px">內容會自動存在這台裝置，離開或關閉頁面後再回來可以接著填。</p>';
+  h += '</div></div>';
+
+  $('#vCase').innerHTML = h;
+  renderPhotos(); renderAttach(); renderProgress();
+}
+function checkedCount(){
+  let n = 0;
+  ITEM_DEFS.forEach(def => {
+    if (def.key === 'vulnerable' && S.cur.vulnerable.missing){ if (S.d.vulName.trim()) n++; return; }
+    const it = S.d.items[def.key];
+    if (it && it.result) n++;
+  });
+  return n;
+}
+function renderProgress(){
+  const n = checkedCount(), p = S.d.photos.length;
+  $('#chkCount').textContent = n + ' / ' + ITEM_DEFS.length;
+  $('#photoCount').textContent = p + ' 張';
+  $('#prog').innerHTML = '核對 <b>'+n+'/'+ITEM_DEFS.length+'</b>・照片 <b>'+p+'</b> 張';
+}
+
+/* 事件 */
+$('#vCase').addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const act = b.dataset.act;
+  if (act === 'back'){ show('#vList'); renderList(); return; }
+  if (act === 'res'){
+    const k = b.dataset.key, v = b.dataset.v;
+    const it = S.d.items[k] || {};
+    it.result = it.result === v ? '' : v;
+    S.d.items[k] = it;
+    const card = $('#it_'+k); const fresh = document.createElement('div');
+    fresh.innerHTML = itemCard(ITEM_DEFS.find(x => x.key === k), S.cur); card.replaceWith(fresh.firstChild);
+    if (it.result === '有誤') setTimeout(() => { const t = $('#fix_'+k); if (t) t.focus(); }, 50);
+    saveDraft(); renderProgress(); return;
+  }
+  if (act === 'sv'){
+    const q = b.dataset.q, v = b.dataset.v;
+    S.d.survey[q] = S.d.survey[q] === v ? '' : v;
+    b.parentElement.querySelectorAll('.opt').forEach(o => o.setAttribute('aria-pressed', String(S.d.survey[q] === o.dataset.v)));
+    saveDraft(); return;
+  }
+  if (act === 'cam'){ $('#camIn').click(); return; }
+  if (act === 'gal'){ $('#galIn').click(); return; }
+  if (act === 'delphoto'){
+    if (await confirmBox('刪除這張照片？', '刪除')){ S.d.photos.splice(+b.dataset.i, 1); saveDraft(); renderPhotos(); renderProgress(); }
+    return;
+  }
+  if (act === 'viewphoto'){ lightbox(S.d.photos[+b.dataset.i].name, S.d.photos[+b.dataset.i].dataUrl); return; }
+  if (act === 'att'){ openAttachment(+b.dataset.i); return; }
+  if (act === 'attretry'){ loadAttachments(); return; }
+});
+$('#vCase').addEventListener('input', e => {
+  const t = e.target;
+  const card = t.closest('.item');
+  if (card && card.classList.contains('err') && t.value.trim()){ card.classList.remove('err'); const m = card.querySelector('.errmsg'); if (m) m.hidden = true; }
+  if (t.dataset.fix){ (S.d.items[t.dataset.fix] = S.d.items[t.dataset.fix] || {}).correction = t.value; saveDraft(); }
+  else if (t.dataset.sv){ S.d.survey[t.dataset.sv] = t.value; saveDraft(); }
+  else if (t.dataset.k === 'note'){ S.d.note = t.value; saveDraft(); }
+  else if (t.dataset.k === 'vulName'){ S.d.vulName = t.value; saveDraft(); renderProgress(); }
+});
+
+/* =========================================================
+   現場照片
+   ========================================================= */
+function loadImg(src){ return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
+async function compress(file){
+  const url = URL.createObjectURL(file);
+  try{
+    const img = await loadImg(url);
+    const s = Math.min(1, PHOTO_MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(img.naturalWidth * s); cv.height = Math.round(img.naturalHeight * s);
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    return cv.toDataURL('image/jpeg', PHOTO_QUALITY);
+  } finally { URL.revokeObjectURL(url); }
+}
+async function addFiles(files){
+  if (!files || !files.length || !S.d) return;
+  for (const f of files){
+    try{
+      const dataUrl = await compress(f);
+      S.d.photos.push({dataUrl, takenAt:new Date().toISOString()});
+    }catch(e){ toast('有一張照片無法讀取，請重拍'); }
+  }
+  S.d.photos.forEach((p, i) => p.name = S.cur.id + '_現場_' + pad(i+1) + '.jpg');
+  saveDraft(); renderPhotos(); renderProgress();
+}
+['#camIn','#galIn'].forEach(s => $(s).addEventListener('change', async e => { await addFiles(e.target.files); e.target.value = ''; }));
+function renderPhotos(){
+  const el = $('#photos'); if (!el) return;
+  S.d.photos.forEach((p, i) => p.name = S.cur.id + '_現場_' + pad(i+1) + '.jpg');
+  el.innerHTML = S.d.photos.length ? S.d.photos.map((p, i) =>
+    '<div class="thumb"><button class="thumb" style="border:none" data-act="viewphoto" data-i="'+i+'" aria-label="放大第'+(i+1)+'張"><img src="'+p.dataUrl+'" alt=""></button>'+
+    '<span class="cap">第 '+(i+1)+' 張</span><button class="x" data-act="delphoto" data-i="'+i+'" aria-label="刪除第'+(i+1)+'張">×</button></div>').join('')
+    : '<div class="muted" style="grid-column:1/-1">尚未拍照</div>';
+}
+
+/* =========================================================
+   申請附件
+   ========================================================= */
+async function loadAttachments(){
+  const id = S.cur.id;
+  if (!isOnline()){ S.attach = {err:'離線中，無法載入申請附件'}; renderAttach(); return; }
+  S.attach = {loading:true}; renderAttach();
+  try{
+    const list = await api.attachments(id);
+    if (!S.cur || S.cur.id !== id) return;
+    S.attach = {list}; renderAttach();
+  }catch(e){
+    if (isCodeErr(e)){ authFail(); return; }
+    S.attach = {err:'申請附件載入失敗：' + friendly(e)}; renderAttach();
+  }
+}
+function renderAttach(){
+  const el = $('#attach'); if (!el) return;
+  const a = S.attach;
+  if (!a || a.loading){ el.innerHTML = '<div class="box muted"><span class="spin"></span> 載入中…</div>'; return; }
+  if (a.err){ el.innerHTML = '<div class="box"><div class="muted">'+esc(a.err)+'</div><button class="btn ghost" style="margin-top:10px;width:100%" data-act="attretry">重新載入</button></div>'; return; }
+  if (!a.list.length){ el.innerHTML = '<div class="box muted">這個案件沒有附件</div>'; return; }
+  const imgs = a.list.map((x, i) => ({x, i})).filter(o => o.x.kind === 'image');
+  const docs = a.list.map((x, i) => ({x, i})).filter(o => o.x.kind !== 'image');
+  let h = '';
+  if (imgs.length) h += '<div class="grid">' + imgs.map(o =>
+    '<button class="thumb" data-act="att" data-i="'+o.i+'" aria-label="'+esc(o.x.label)+'">'+(o.x.thumb ? '<img src="'+o.x.thumb+'" alt="">' : '')+
+    '<span class="cap">'+esc(o.x.label)+'</span></button>').join('') + '</div>';
+  if (docs.length) h += '<div class="files">' + docs.map(o =>
+    '<button class="file" data-act="att" data-i="'+o.i+'"><span class="ic">PDF</span><span>'+esc(o.x.label)+'</span></button>').join('') + '</div>';
+  el.innerHTML = h;
+}
+async function openAttachment(i){
+  const a = S.attach.list[i];
+  if (a.kind !== 'image'){ window.open(a.url, '_blank'); return; }
+  const lb = lightbox(a.label, null);
+  try{
+    const src = await api.image(a.id);
+    lb.set(src);
+  }catch(e){ lb.fail('圖片載入失敗：' + friendly(e)); }
+}
+function lightbox(title, src){
+  const el = document.createElement('div'); el.className = 'lb';
+  el.innerHTML = '<div class="lbtop"><span>'+esc(title)+'</span><button class="lbclose">關閉</button></div><div class="stage"></div>';
+  const stage = el.querySelector('.stage');
+  const set = s => { stage.innerHTML = s ? '<img src="'+s+'" alt="">' : '<div class="phbig">（此處顯示原始照片）</div>'; };
+  const fail = m => { stage.innerHTML = '<div class="phbig">'+esc(m)+'</div>'; };
+  if (src) set(src); else stage.innerHTML = '<div class="phbig"><span class="spin"></span></div>';
+  el.querySelector('.lbclose').onclick = () => el.remove();
+  document.body.appendChild(el);
+  return {set, fail};
+}
+
+/* =========================================================
+   送出
+   ========================================================= */
+function validate(){
+  const errs = [];
+  document.querySelectorAll('.item').forEach(x => { x.classList.remove('err'); const m = x.querySelector('.errmsg'); if (m) m.hidden = true; });
+  ITEM_DEFS.forEach(def => {
+    let msg = '';
+    if (def.key === 'vulnerable' && S.cur.vulnerable.missing){ if (!S.d.vulName.trim()) msg = '請填寫現場確認的姓名'; }
+    else {
+      const it = S.d.items[def.key] || {};
+      if (!it.result) msg = '請選擇正確或有誤';
+      else if (it.result === '有誤' && !(it.correction || '').trim()) msg = '請填寫正確內容';
+    }
+    if (msg){ const card = $('#it_'+def.key); card.classList.add('err'); const m = card.querySelector('.errmsg'); m.textContent = msg; m.hidden = false; errs.push(card); }
+  });
+  return errs;
+}
+$('#submitBtn').addEventListener('click', async () => {
+  const errs = validate();
+  if (errs.length){ errs[0].scrollIntoView({behavior:'smooth', block:'start'}); toast('還有 ' + errs.length + ' 項未完成核對'); return; }
+  if (!S.d.photos.length && !(await confirmBox('還沒有拍任何現場照片，確定要送出嗎？', '仍要送出', '回去拍照'))) return;
+  const c = S.cur, d = S.d, now = new Date();
+  const items = ITEM_DEFS.map(def => {
+    if (def.key === 'vulnerable' && c.vulnerable.missing) return {key:def.key, label:def.label, listed:'名單未載', result:'現場補填', correction:d.vulName.trim()};
+    const it = d.items[def.key];
+    return {key:def.key, label:def.label, listed:listedText(def.key, c), result:it.result, correction:it.result === '有誤' ? it.correction.trim() : ''};
+  });
+  const record = {
+    sid: d.sid, caseId: c.id, seq: c.seq, type: c.type,
+    inspectedAt: now.toISOString(), dateKey: dateKey(now), startedAt: d.startedAt, by: S.name,
+    items,
+    survey: S.config.questions.map(q => ({id:q.id, title:q.title, answer:d.survey[q.id] || ''})),
+    note: d.note.trim(), photoCount: d.photos.length
+  };
+  const entry = {sid:d.sid, caseId:c.id, record, photos:d.photos.map(p => ({name:p.name, dataUrl:p.dataUrl})), uploaded:[], begun:false, folderUrl:'', state:'pending', error:'', createdAt:now.toISOString()};
+  await Store.put('queue', entry);
+  await Store.del('drafts', c.id); delete S.drafts[c.id];
+  S.queue = S.queue.filter(q => q.sid !== entry.sid).concat(entry);
+  renderQueueBtn();
+  renderDone(entry); show('#vDone');
+  processQueue();
+});
+function listedText(key, c){
+  if (key === 'applicant') return c.applicant.name;
+  if (key === 'address') return c.address.equip;
+  if (key === 'vulnerable') return c.vulnerable.names.join('、') + '｜' + (c.vulnerable.categories || []).join('、');
+  if (key === 'elec') return fmtElec(c.elec.no);
+  if (key === 'equipment') return c.type + '｜' + c.equipment.map(r => r.label + '：' + (r.value || '—')).join('；');
+  return '';
+}
+
+/* 送出後畫面 */
+function renderDone(entry){
+  const total = entry.photos.length || 0, up = entry.uploaded.length;
+  let title, desc, pct;
+  if (entry.state === 'done'){ title = '上傳完成'; desc = '查驗紀錄與 ' + entry.record.photoCount + ' 張照片已存到雲端'; pct = 100; }
+  else if (entry.error){ title = '已存在手機，尚未上傳'; desc = entry.error + '。有網路時會自動補傳，也可以從右上角「待上傳」手動重試。'; pct = total ? up/total*95 : 0; }
+  else if (!isOnline()){ title = '已存在手機'; desc = '目前離線，恢復網路後會自動上傳。請不要清除瀏覽器資料。'; pct = 0; }
+  else { title = '上傳中…'; desc = total ? ('照片 ' + up + ' / ' + total) : '寫入查驗紀錄'; pct = total ? up/total*95 : 50; }
+  $('#vDone').innerHTML = '<div class="donebox" data-sid="'+esc(entry.sid)+'">'+
+    '<div class="muted">'+esc(entry.caseId)+'</div><div class="big">'+esc(title)+'</div><div class="muted">'+esc(desc)+'</div>'+
+    '<div class="bar"><i style="width:'+pct+'%"></i></div>'+
+    (entry.folderUrl && entry.state === 'done' ? '<a class="btn ghost" href="'+esc(entry.folderUrl)+'" target="_blank" style="text-decoration:none;margin-top:12px">開啟雲端資料夾</a>' : '')+
+    '<div class="acts"><button class="btn solid" id="nextBtn">查驗下一件</button></div></div>';
+  $('#nextBtn').onclick = () => { $('#q').value = ''; S.query = null; show('#vList'); renderList(); setTimeout(() => $('#q').focus(), 100); };
+}
+
+/* =========================================================
+   上傳佇列（離線補傳）
+   ========================================================= */
+async function processQueue(){
+  if (S.uploading || !isOnline() || !S.code) return;
+  const todo = pendingQueue(); if (!todo.length) return;
+  S.uploading = true;
+  for (const q of todo){
+    try{
+      q.error = '';
+      if (!q.begun){
+        const r = await api.begin(q.record);
+        q.begun = true; q.folderUrl = r.folderUrl || ''; await Store.put('queue', q);
+      }
+      for (let i = 0; i < q.photos.length; i++){
+        if (q.uploaded.includes(i)) continue;
+        if (!isOnline()) throw new Error('網路中斷');
+        await api.photo(q.sid, i, q.photos[i].name, q.photos[i].dataUrl.split(',')[1]);
+        q.uploaded.push(i); await Store.put('queue', q); onQueueProgress(q);
+      }
+      await api.finish(q.record);
+      q.state = 'done'; q.doneAt = new Date().toISOString(); q.photos = []; // 上傳完成即清掉手機上的照片
+      await Store.put('queue', q);
+      const c = S.cases.find(x => x.id === q.caseId);
+      if (c){ c.inspected = (c.inspected || []).concat([{date:q.record.dateKey, by:q.record.by}]); }
+    }catch(e){
+      q.error = friendly(e);
+      await Store.put('queue', q);
+      onQueueProgress(q);
+      if (isCodeErr(e)){ S.uploading = false; authFail(); return; }
+      break;
+    }
+    onQueueProgress(q);
+  }
+  S.uploading = false;
+  renderQueueBtn(); renderList();
+  if (pendingQueue().some(q => !q.error)) processQueue();
+}
+function onQueueProgress(q){
+  renderQueueBtn();
+  const box = document.querySelector('#vDone .donebox');
+  if (box && box.dataset.sid === q.sid && !$('#vDone').hidden){
+    // 保留完成時已清除的照片數量顯示
+    renderDone(q);
+  }
+  if (document.querySelector('.scrim .sheet')) openQueue(true);
+}
+
+$('#qBtn').addEventListener('click', () => openQueue(false));
+function openQueue(refreshOnly){
+  let s = document.querySelector('.scrim.qs');
+  if (!s){
+    if (refreshOnly) return;
+    s = document.createElement('div'); s.className = 'scrim qs';
+    s.addEventListener('click', e => {
+      if (e.target === s || e.target.closest('[data-a="close"]')) s.remove();
+      if (e.target.closest('[data-a="retry"]')){ pendingQueue().forEach(q => q.error = ''); processQueue(); openQueue(true); }
+    });
+    document.body.appendChild(s);
+  }
+  const pend = pendingQueue();
+  const done = S.queue.filter(q => q.state === 'done').sort((a,b) => b.doneAt.localeCompare(a.doneAt)).slice(0, 10);
+  s.innerHTML = '<div class="sheet" role="dialog" aria-modal="true"><h3>待上傳 '+pend.length+' 筆</h3>'+
+    '<div class="muted">'+(isOnline() ? (S.uploading ? '正在上傳…' : '連線中') : '目前離線，恢復網路後自動上傳')+'</div>'+
+    (pend.length ? pend.map(q => '<div class="qitem"><div class="t"><span>'+esc(q.caseId)+'</span><span>'+q.uploaded.length+'/'+q.photos.length+' 張</span></div>'+
+      '<div class="s">'+fmtTime(q.createdAt)+' 送出</div>'+(q.error ? '<div class="e">'+esc(q.error)+'</div>' : '')+'</div>').join('') : '<div class="qitem"><div class="s">沒有待上傳的紀錄</div></div>')+
+    (done.length ? '<h3 style="margin-top:18px;font-size:16px">最近已上傳</h3>' + done.map(q => '<div class="qitem"><div class="t"><span>'+esc(q.caseId)+'</span><span class="done-tag">✓</span></div><div class="s">'+fmtTime(q.doneAt)+' 完成・照片 '+q.record.photoCount+' 張</div></div>').join('') : '')+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px">'+
+    '<button class="btn ghost" data-a="close">關閉</button><button class="btn solid" data-a="retry"'+(pend.length && isOnline() ? '' : ' disabled')+'>立即上傳</button></div></div>';
+}
+
+boot();
+</script>
+</body>
+</html>
