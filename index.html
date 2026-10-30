@@ -166,6 +166,9 @@ textarea:focus,.field input:focus{outline:none;border-color:var(--accent)}
 .lb img{max-width:100%;max-height:100%;object-fit:contain}
 .lb .stage.doc{display:block;overflow:auto;-webkit-overflow-scrolling:touch;padding:8px 8px 24px}
 .lb .stage.doc canvas{display:block;margin:0 auto 10px;background:#fff;max-width:100%}
+.lb .pv{max-width:100%;max-height:100%;overflow:auto;text-align:center}
+.lb .pv img{max-width:100%;display:block;margin:0 auto;background:#fff}
+.lb .pvnote{color:#cfd8d4;font-size:13px;margin-top:8px}
 .lb .phbig{width:min(92vw,520px);aspect-ratio:4/3;background:#2a322f;border-radius:10px;display:grid;place-items:center;color:#a9b5b0;font-size:14px;text-align:center;padding:12px}
 .toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#1b2320;color:#fff;padding:10px 16px;border-radius:12px;font-size:15px;z-index:60;max-width:calc(100% - 32px);text-align:center}
 .spin{width:18px;height:18px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp 1s linear infinite;display:inline-block;vertical-align:middle}
@@ -364,6 +367,7 @@ let api = (IS_GAS || EXEC_URL) ? {
   bootstrap:   ()                 => gas('getBootstrap', S.code),
   attachments: caseId             => gas('getAttachments', S.code, caseId),
   image:       fileId             => gas('getImage', S.code, fileId),
+  preview:     fileId             => gas('getPdfPreview', S.code, fileId),
   begin:       rec                => gas('beginSubmission', S.code, rec),
   photo:       (sid, i, name, b64)=> gas('uploadPhoto', S.code, sid, i, name, b64),
   finish:      rec                => gas('finishSubmission', S.code, rec)
@@ -765,11 +769,32 @@ async function openAttachment(i){
   const a = S.attach.list[i];
   const lb = lightbox(a.label, null);
   try{
+    if (a.kind === 'pdf'){ await openPdf(lb, a); return; }
     const src = await api.image(a.id);
     if (a.kind === 'image') lb.set(src);
-    else if (a.kind === 'pdf'){ if (!src){ lb.fail('（此處顯示 PDF 內容）'); return; } await showPdf(lb, src); }
     else lb.fail('這個檔案類型無法在頁面上顯示');
   }catch(e){ lb.fail('檔案載入失敗：' + friendly(e)); }
+}
+function withTimeout(p, ms){ return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('逾時')), ms))]); }
+async function openPdf(lb, a){
+  // 先顯示雲端產生的第 1 頁預覽圖，再嘗試逐頁顯示完整 PDF；完整顯示失敗時保留預覽圖
+  const st = {full:false};
+  const pv = api.preview(a.id).then(url => {
+    if (st.full || !lb.stage.isConnected || !url) return;
+    lb.stage.className = 'stage';
+    lb.stage.innerHTML = '<div class="pv"><img src="'+esc(url)+'" alt=""><div class="pvnote">第 1 頁預覽・完整檔案載入中…</div></div>';
+  }).catch(() => {});
+  try{
+    const src = await api.image(a.id);
+    if (!src){ await pv; if (!lb.stage.querySelector('.pv')) lb.fail('（此處顯示 PDF 內容）'); return; }
+    await withTimeout(showPdf(lb, src, st), 25000);
+  }catch(e){
+    await pv;
+    if (st.full) return;
+    const note = lb.stage.querySelector('.pvnote');
+    if (note) note.textContent = '只顯示第 1 頁（這台裝置無法顯示完整檔案）';
+    else lb.fail('檔案載入失敗：' + friendly(e));
+  }
 }
 let pdfjsReady = null;
 function loadPdfJs(){
@@ -786,16 +811,16 @@ function loadPdfJs(){
   });
   return pdfjsReady;
 }
-async function showPdf(lb, dataUrl){
+async function showPdf(lb, dataUrl, st){
   const lib = await loadPdfJs();
   const bin = atob(dataUrl.slice(dataUrl.indexOf(',') + 1));
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   const pdf = await lib.getDocument({data: bytes}).promise;
   const stage = lb.stage;
-  stage.className = 'stage doc'; stage.innerHTML = '';
   const w = Math.max(200, Math.min(stage.clientWidth - 16, 1000));
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const box = document.createElement('div');   // 第 1 頁畫好後才換上，避免把預覽圖換成空白
   for (let p = 1; p <= pdf.numPages; p++){
     if (!stage.isConnected) return;            // 已關閉
     const page = await pdf.getPage(p);
@@ -803,8 +828,12 @@ async function showPdf(lb, dataUrl){
     const vp = page.getViewport({scale: scale * dpr});
     const cv = document.createElement('canvas');
     cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height); cv.style.width = w + 'px';
-    stage.appendChild(cv);
+    box.appendChild(cv);
     await page.render({canvasContext: cv.getContext('2d'), viewport: vp}).promise;
+    if (p === 1){
+      if (st) st.full = true;
+      stage.className = 'stage doc'; stage.innerHTML = ''; stage.appendChild(box);
+    }
   }
 }
 function lightbox(title, src){
