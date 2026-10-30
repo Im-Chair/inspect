@@ -164,6 +164,8 @@ textarea:focus,.field input:focus{outline:none;border-color:var(--accent)}
 .lb .lbclose{background:none;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:10px;min-height:44px;padding:0 14px;flex:none}
 .lb .stage{flex:1;display:flex;align-items:center;justify-content:center;padding:8px;overflow:auto}
 .lb img{max-width:100%;max-height:100%;object-fit:contain}
+.lb .stage.doc{display:block;overflow:auto;-webkit-overflow-scrolling:touch;padding:8px 8px 24px}
+.lb .stage.doc canvas{display:block;margin:0 auto 10px;background:#fff;max-width:100%}
 .lb .phbig{width:min(92vw,520px);aspect-ratio:4/3;background:#2a322f;border-radius:10px;display:grid;place-items:center;color:#a9b5b0;font-size:14px;text-align:center;padding:12px}
 .toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#1b2320;color:#fff;padding:10px 16px;border-radius:12px;font-size:15px;z-index:60;max-width:calc(100% - 32px);text-align:center}
 .spin{width:18px;height:18px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp 1s linear infinite;display:inline-block;vertical-align:middle}
@@ -759,13 +761,51 @@ function renderAttach(){
   el.innerHTML = h;
 }
 async function openAttachment(i){
+  // 圖片與 PDF 都由頁面自己載入顯示，不開 Google 雲端連結（避免 Safari 帶入 Google 登入資料而打不開）
   const a = S.attach.list[i];
-  if (a.kind !== 'image'){ window.open(a.url, '_blank'); return; }
   const lb = lightbox(a.label, null);
   try{
     const src = await api.image(a.id);
-    lb.set(src);
-  }catch(e){ lb.fail('圖片載入失敗：' + friendly(e)); }
+    if (a.kind === 'image') lb.set(src);
+    else if (a.kind === 'pdf'){ if (!src){ lb.fail('（此處顯示 PDF 內容）'); return; } await showPdf(lb, src); }
+    else lb.fail('這個檔案類型無法在頁面上顯示');
+  }catch(e){ lb.fail('檔案載入失敗：' + friendly(e)); }
+}
+let pdfjsReady = null;
+function loadPdfJs(){
+  if (pdfjsReady) return pdfjsReady;
+  pdfjsReady = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = () => {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      res(window.pdfjsLib);
+    };
+    s.onerror = () => { pdfjsReady = null; rej(new Error('PDF 檢視元件載入失敗，請確認網路')); };
+    document.head.appendChild(s);
+  });
+  return pdfjsReady;
+}
+async function showPdf(lb, dataUrl){
+  const lib = await loadPdfJs();
+  const bin = atob(dataUrl.slice(dataUrl.indexOf(',') + 1));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const pdf = await lib.getDocument({data: bytes}).promise;
+  const stage = lb.stage;
+  stage.className = 'stage doc'; stage.innerHTML = '';
+  const w = Math.max(200, Math.min(stage.clientWidth - 16, 1000));
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  for (let p = 1; p <= pdf.numPages; p++){
+    if (!stage.isConnected) return;            // 已關閉
+    const page = await pdf.getPage(p);
+    const scale = w / page.getViewport({scale: 1}).width;
+    const vp = page.getViewport({scale: scale * dpr});
+    const cv = document.createElement('canvas');
+    cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height); cv.style.width = w + 'px';
+    stage.appendChild(cv);
+    await page.render({canvasContext: cv.getContext('2d'), viewport: vp}).promise;
+  }
 }
 function lightbox(title, src){
   const el = document.createElement('div'); el.className = 'lb';
@@ -776,7 +816,7 @@ function lightbox(title, src){
   if (src) set(src); else stage.innerHTML = '<div class="phbig"><span class="spin"></span></div>';
   el.querySelector('.lbclose').onclick = () => el.remove();
   document.body.appendChild(el);
-  return {set, fail};
+  return {set, fail, stage};
 }
 
 /* =========================================================
